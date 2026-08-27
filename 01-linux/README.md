@@ -113,3 +113,60 @@ This mirrors a real DevOps scenario — fixing permission drift after a deploy o
 
 ## Status
 ✅ Day 3 complete — permissions, ownership, and umask practiced; wrote fix-perms.sh
+
+# Day 4 — Process Management
+
+## Goal
+Learn to view, control, and prioritize processes on Linux.
+
+## Environment
+Practiced on KillerCoda.
+
+## Commands used
+```bash
+ps aux
+sleep 300 &
+jobs
+kill -10 1027
+nice -n 10 sleep 100 &
+renice 5 -p 1079
+sudo renice 5 -p 1079
+killall sleep
+nano find-hog.sh
+chmod +x find-hog.sh
+./find-hog.sh
+```
+
+## What happened (real troubleshooting)
+
+**Killing a background job**
+- Started `sleep 300 &`, tried `kill -10 <PID>`
+- Result: `User defined signal 1` — NOT actually killed. `-10` is `SIGUSR1`, a signal meant for custom app-defined behavior, not termination.
+- Lesson: signal numbers matter. `kill -9` (SIGKILL) or plain `kill` (SIGTERM) actually terminate a process; `kill -10` does something else entirely depending on what the process does with it.
+
+**renice — process ownership matters**
+- `renice 5 -p 1027` → failed: `No such process` (process had already ended/wasn't right PID)
+- `renice 5 -p 1079` → failed: `Permission denied` (my user doesn't own the priority-lowering privilege by default)
+- `sudo renice 5 -p 1079` → worked: `old priority 10, new priority 5`
+- Lesson: lowering a process's niceness (making it higher priority) requires root, even if you own the process. Regular users can only make their own processes *less* favorable (higher nice value), not more.
+
+**killall**
+- `killall sleep` cleanly terminated the background sleep job.
+
+## Mini task — find-hog.sh
+```bash
+#!/bin/bash
+# find-hog.sh - prints the top 3 CPU-consuming processes
+echo "Top 3 CPU-consuming processes:"
+ps aux --sort=-%cpu | head -4
+```
+- Made executable with `chmod +x find-hog.sh`, ran with `./find-hog.sh`
+- Output showed `snapfuse` and `snapd` processes as top CPU consumers on this sandbox — makes sense since those are the system's active background services in this environment.
+
+## Notes / takeaways
+- Signal numbers aren't interchangeable — `kill -9` (force kill) vs `kill -10` (SIGUSR1) behave completely differently. Worth memorizing the common ones: 1 (HUP), 9 (KILL), 15 (TERM, default).
+- Priority changes that favor a process (lower nice value) need root — this is a security-sensible default, similar to least-privilege thinking from bug bounty work.
+- Wrote and ran my first actual shell script today, not just copy-pasted commands.
+
+## Status
+✅ Day 4 complete — process management, signals, renice permissions, first shell script (find-hog.sh)
