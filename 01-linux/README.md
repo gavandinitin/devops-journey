@@ -170,3 +170,86 @@ ps aux --sort=-%cpu | head -4
 
 ## Status
 ✅ Day 4 complete — process management, signals, renice permissions, first shell script (find-hog.sh)
+
+# Day 5 — systemd & Services
+
+## Goal
+Understand how systemd manages services, and create/run a custom service.
+
+## Environment
+Practiced on a local Ubuntu VM (not KillerCoda this time).
+
+## Commands used
+```bash
+systemctl list-units --type=service
+systemctl status cron
+systemctl status ssh / sshd
+sudo systemctl stop cron
+sudo systemctl start cron
+sudo systemctl restart cron
+systemctl is-enabled cron
+sudo systemctl disable cron
+sudo systemctl enable cron
+nano myservice.sh
+chmod +x myservice.sh
+sudo mv myservice.sh /usr/local/bin/myservice.sh
+sudo nano /etc/systemd/system/myservice.service
+sudo systemctl daemon-reload
+sudo systemctl start myservice
+systemctl status myservice
+cat /tmp/myservice.log
+sudo systemctl stop myservice
+```
+
+## What happened (real troubleshooting)
+
+**ssh/sshd not found**
+- `systemctl status ssh` and `systemctl status sshd` both returned "Unit could not be found."
+- Reason: SSH server isn't installed by default on this system — the ssh *client* is present, but the service only exists once `openssh-server` is installed. Picked `cron` instead since it's active by default.
+
+**Permission required to stop a service**
+- `systemctl stop cron` (no sudo) → failed: "Access denied... requires interactive authentication."
+- `sudo systemctl stop cron` → worked.
+- Lesson: read-only actions like `status` and `list-units` don't need root, but state-changing actions (start/stop/restart/enable/disable) do.
+
+**enable vs start — confirmed the distinction**
+- `is-enabled cron` → `disabled` initially (won't auto-start on boot)
+- `sudo systemctl enable cron` → created a symlink in `/etc/systemd/system/multi-user.target.wants/` pointing to the actual unit file — this symlink IS what "enabled" means under the hood
+- Confirmed `disable` removes that same symlink
+- This makes clear: **enable/disable controls boot-time behavior, start/stop controls current runtime state** — independent of each other
+
+## Custom service — myservice.service
+
+**Script:**
+```bash
+#!/bin/bash
+while true; do
+  echo "Service running at $(date)" >> /tmp/myservice.log
+  sleep 10
+done
+```
+
+**Unit file (`/etc/systemd/system/myservice.service`):**
+```ini
+[Unit]
+Description=My Test Service
+
+[Service]
+ExecStart=/usr/local/bin/myservice.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Result:**
+- `systemctl status myservice` showed `active (running)`, Main PID tracked correctly, and the CGroup tree showed both the bash script AND its child `sleep 10` process — systemd tracks the whole process tree, not just the top one.
+- `cat /tmp/myservice.log` confirmed new lines appearing every ~10 seconds, timestamps matching exactly.
+
+## Notes / takeaways
+- The enable/disable vs start/stop distinction finally clicked by actually toggling both independently and checking `is-enabled` each time — this is a common interview question and now I can explain it from having broken it myself.
+- systemd tracks the full process tree of a service (parent script + child processes), which matters for things like `systemctl stop` correctly killing everything, not just the main PID.
+- Real troubleshooting > tutorial happy-path: hitting the "ssh not found" and "permission denied" errors taught more than if everything had worked first try.
+
+## Status
+✅ Day 5 complete — systemd service lifecycle, enable/disable vs start/stop, wrote and ran a custom service
