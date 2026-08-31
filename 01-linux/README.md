@@ -253,3 +253,100 @@ WantedBy=multi-user.target
 
 ## Status
 ✅ Day 5 complete — systemd service lifecycle, enable/disable vs start/stop, wrote and ran a custom service
+
+# Day 6 — Mini Project: Automated Server Setup Script
+
+## Goal
+Combine filesystem, permissions, process management, and systemd knowledge from Days 2-5 into one bootstrap script — and test how it behaves when run more than once.
+
+## Environment
+Practiced on a local Ubuntu VM.
+
+## Script — setup.sh
+```bash
+#!/bin/bash
+set -e
+
+APP_USER="appuser"
+APP_DIR="/opt/myapp"
+
+echo "Creating user $APP_USER..."
+sudo useradd -m -s /bin/bash "$APP_USER" || echo "User already exists"
+
+echo "Creating app directory..."
+sudo mkdir -p "$APP_DIR"
+sudo chown "$APP_USER":"$APP_USER" "$APP_DIR"
+sudo chmod 755 "$APP_DIR"
+
+echo "Writing app script..."
+sudo tee "$APP_DIR/run.sh" > /dev/null <<'EOF'
+#!/bin/bash
+while true; do
+  echo "App running at $(date)" >> /opt/myapp/app.log
+  sleep 10
+done
+EOF
+sudo chmod +x "$APP_DIR/run.sh"
+sudo chown "$APP_USER":"$APP_USER" "$APP_DIR/run.sh"
+
+echo "Creating systemd service..."
+sudo tee /etc/systemd/system/myapp.service > /dev/null <<EOF
+[Unit]
+Description=My App Service
+
+[Service]
+User=$APP_USER
+ExecStart=$APP_DIR/run.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+echo "Starting service..."
+sudo systemctl daemon-reload
+sudo systemctl enable myapp
+sudo systemctl start myapp
+
+echo "Done. Checking status:"
+systemctl status myapp --no-pager
+```
+
+## Run 1 — first execution
+- User created, directory created, script written, service created, enabled, and started
+- `systemctl status myapp` → `active (running)`, Main PID 1001, child process `date` under CGroup
+- `tail -f /opt/myapp/app.log` confirmed new lines appending every 10 seconds
+
+## Run 2 — ran the exact same script again (idempotency test)
+
+| Step | What happened |
+|---|---|
+| `useradd` | `useradd: user 'appuser' already exists` → caught by the `\|\| echo "User already exists"` fallback, script did NOT crash |
+| `mkdir -p` | Silent success — `-p` flag means "create if missing, do nothing if it exists" — no error |
+| `chown`/`chmod` | Ran again with no issue — reapplying the same ownership/permissions is harmless |
+| Writing run.sh via `tee` | Overwrote the file with identical content — no error, no duplication |
+| systemd service file | Overwritten with identical content via `tee` |
+| `daemon-reload` + `enable` + `start` | No error — `systemctl start` on an already-running service is a no-op, it just confirms it's already active |
+| Result | Service still shows `active (running)` — but notice the **start timestamp stayed the same** ("since Mon 2026-08-31 09:04:47 UTC; 1min 20s ago") — meaning the service was NOT restarted, just confirmed already running. CGroup PID also unchanged (1001), only the child process changed from `date` to `sleep 10` since it's mid-loop. |
+
+## Why it didn't break — idempotency
+This script is (mostly) **idempotent** — running it multiple times produces the same end state without errors, because:
+- `useradd` failure is caught with `||`
+- `mkdir -p` is naturally idempotent
+- `tee` overwriting a file with the same content is harmless
+- `systemctl enable`/`start` are no-ops if already enabled/running
+
+**What's NOT truly idempotent here:** if I changed `run.sh` and reran the script, `tee` would update the file on disk, but the *already-running* process wouldn't pick up the change — I'd need `systemctl restart myapp` for that. The script currently doesn't restart the service to apply changes, only starts it if it's not running.
+
+## Notes / takeaways
+- This is my first real taste of "idempotency" — a core concept in DevOps tooling (Ansible, Terraform are built entirely around this idea: running the same config repeatedly should converge to the same state, not error out or duplicate work).
+- `set -e` combined with `||` fallbacks is how you selectively allow expected failures (like "user already exists") while still failing hard on real errors.
+- Running services as a dedicated non-root user (`User=$APP_USER` in the unit file) is a least-privilege practice — directly connects to security instincts from bug bounty work.
+- Found a real gap: script doesn't restart the service on config changes — noting this as something to improve later (could add a restart step conditionally).
+
+## Status
+✅ Day 6 complete — Week 1 wrapped up. Built an idempotent server bootstrap script combining users, permissions, file scripting, and systemd services.
+
+---
+## 🎉 Week 1 Complete — Linux Fundamentals
+Covered: filesystem hierarchy, permissions/ownership, process management, systemd services, and a combined mini project. Ready to move into Week 2: Bash Scripting + Networking.
