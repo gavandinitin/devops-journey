@@ -11,7 +11,7 @@ Following a structured, hands-on roadmap - no fluff, real configs, real scripts,
 ## 📊 Progress Tracker
 
 ### Phase 1: Foundations
-- [ ] Linux fundamentals (filesystem, permissions, processes, systemd)
+- [x] Linux fundamentals (filesystem, permissions, processes, systemd)
 - [ ] Shell scripting (bash automation)
 - [ ] Networking basics (DNS, HTTP, load balancers, firewalls)
 - [ ] Git & GitHub (branching, PRs, workflows)
