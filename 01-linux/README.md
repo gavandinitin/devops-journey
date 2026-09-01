@@ -347,6 +347,37 @@ This script is (mostly) **idempotent** — running it multiple times produces th
 ## Status
 ✅ Day 6 complete — Week 1 wrapped up. Built an idempotent server bootstrap script combining users, permissions, file scripting, and systemd services.
 
----
 ## 🎉 Week 1 Complete — Linux Fundamentals
 Covered: filesystem hierarchy, permissions/ownership, process management, systemd services, and a combined mini project. Ready to move into Week 2: Bash Scripting + Networking.
+
+---
+
+## Day 7 — Bash Basics: Variables, Loops, Conditionals
+ 
+**Goal:** Practice variables, command substitution, conditionals, loops; build disk-check.sh and backup.sh.
+ 
+**Environment:** Local Ubuntu VM
+ 
+**Real troubleshooting (4 separate bugs, all self-fixed)**
+ 
+1. **testing.sh — syntax error near `elif`**
+   `elif [ "$num" -eq 10 ] then` was missing a `;` before `then`. Fixed, then verified all 3 branches (`25` → "Greater than 10", `10` → "Exactly 10", `5` → "Less than 10").
+2. **looping.sh — silent partial failure**
+```
+   line 5: count: command not found
+   line 6: [: -le: unary operator expected
+```
+   The increment line was malformed, so `count` stayed unset — an unset variable in `[ $count -le 5 ]` throws "unary operator expected." Importantly, the `for` loop and file-listing loop below it in the same script still ran fine — **bash doesn't stop on error by default**. This is exactly why `set -e` (used in Day 6) matters.
+ 
+3. **diskcheck.sh — "integer expected" errors**
+   Hit this twice, once for `usage` and once for `threshold` — both times because a variable wasn't a clean integer (leftover whitespace/`%`). Fixed by re-checking the `awk`/`tr` extraction logic. Final run: `OK: Disk usage is at 1%, within threshold of 80%`.
+4. **Typo:** `chod +x` instead of `chmod +x` — terminal's suggestion pointed straight to the fix.
+**backup.sh** — ran clean, verified with `cat run.sh.bak` that the backed-up file matched the original byte-for-byte, not just by filename.
+ 
+**Takeaways**
+- Biggest lesson: bash does not halt on errors by default. A script can throw errors mid-run and still report "success" at the end — always check exit codes or use `set -e` for scripts that matter.
+- "integer expected" in `[ ]` comparisons almost always means a variable is empty, unset, or has hidden characters — not that the logic itself is wrong. `echo "[$var]"` is a good way to spot this.
+- Always verify output for real (e.g. `cat` the backup) instead of trusting an echo statement that just says "done."
+
+## Status
+✅ Day 7 complete — variables, conditionals, loops, disk-check.sh, backup.sh built; 4 real bash errors debugged and fixed.
