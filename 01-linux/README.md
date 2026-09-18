@@ -381,3 +381,59 @@ Covered: filesystem hierarchy, permissions/ownership, process management, system
 
 ## Status
 ✅ Day 7 complete — variables, conditionals, loops, disk-check.sh, backup.sh built; 4 real bash errors debugged and fixed.
+
+## Day 8 — Bash: Functions, Error Handling, Exit Codes
+
+**Goal:** Practice functions, exit codes, and see the real-world impact of `set -e` on error handling.
+
+**Environment:** Local Ubuntu VM
+
+**Functions (functions.sh)**
+```bash
+greet() {
+  local name=$1
+  echo "Hello, $name!"
+}
+add_numbers() {
+  local a=$1
+  local b=$2
+  echo $((a + b))
+}
+```
+Output: `Hello, Nitin!` / `Sum is: 12` — confirmed `local` scoping and using `echo` + `$(...)` to "return" values from a function.
+
+**Exit codes**
+- `ls /nonexistent-folder` → `Exit code: 2`
+- `ls /home` → `Exit code: 0`
+- Confirmed `$?` holds the exit status of the last command; `0` = success, non-zero = failure.
+
+**check-service.sh** — function-based error handling
+```bash
+check_service() {
+  local service=$1
+  if systemctl is-active --quiet "$service"; then
+    echo "$service is running"
+    return 0
+  else
+    echo "ERROR: $service is not running"
+    return 1
+  fi
+}
+```
+- `check_service "cron"` → "cron is running"
+- `check_service "nonexistent-service"` → "ERROR: ... is not running" → triggered the "Action needed" branch correctly based on `$?`
+
+**broken-loop.sh — set -e comparison (the key exercise)**
+
+Bug: `count=count + 1` looks like arithmetic but is actually string assignment — bash parses it as a temporary env var assigned only to the following command (`+`), which fails with "command not found." The real `count` variable is never updated.
+
+- **Without `set -e`:** infinite loop. `count` stays `1` forever since the increment never actually applies, so `[ $count -le 5 ]` is always true. Had to Ctrl+C to stop it.
+- **With `set -e`:** script exits immediately after the first failed `+` command — one iteration, then stops. No infinite loop.
+
+## Takeaways
+- `count=value command` syntax (no proper `$(( ))`) creates a temporary environment variable for that one command only — it does NOT persist to the shell's variable. This is a subtle bash gotcha worth remembering: real increment needs `count=$((count + 1))`.
+- `set -e` isn't just about "failing loudly" — here it actively prevented an infinite loop. In a real server/CI environment, an unguarded infinite loop could hang a process indefinitely; `set -e` converts that into an instant, visible failure instead.
+- Functions with `return 0` / `return 1` + checking `$?` is a clean pattern for building health-check-style scripts — directly usable for real monitoring tasks later.
+
+## Status
+✅ Day 8 complete — functions, exit codes, and a live demonstration of how `set -e` prevents an infinite loop caused by broken variable assignment.
